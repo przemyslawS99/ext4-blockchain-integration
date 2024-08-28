@@ -7,60 +7,38 @@ import (
 
 	"github.com/mdlayher/genetlink"
 	"github.com/mdlayher/netlink"
+	"github.com/przemyslawS99/ext4-blockchain-integration/internal/common"
+	"github.com/przemyslawS99/ext4-blockchain-integration/internal/fabric"
 )
 
-type time struct {
-	sec  uint64
-	nsec uint32
-}
-
-type attrs struct {
-	uid   uint32
-	gid   uint32
-	atime time
-	mtime time
-	ctime time
-	mode  uint32
-	ino   uint64
-}
-
-func NewConn() (*genetlink.Conn, error) {
+func NewConn() (*genetlink.Conn, genetlink.Family, error) {
 	c, err := genetlink.Dial(nil)
 	if err != nil {
 		log.Fatalf("failed to dial generic netlink: %v", err)
 	}
-	defer c.Close()
 
-	family, err := c.GetFamily(familyName)
+	family, err := c.GetFamily(common.FamilyName)
 	if err != nil {
 		if errors.Is(err, os.ErrNotExist) {
-			log.Fatalf("%q family not available", familyName)
+			log.Fatalf("%q family not available", common.FamilyName)
 		}
 		log.Fatalf("failed to query for family: %v", err)
 	}
 
-	log.Printf("%s: %+v", familyName, family)
+	log.Printf("%s: %+v", common.FamilyName, family)
 
-	if err := c.JoinGroup(uint32(groupID)); err != nil {
+	err = sendSetPid(c, family)
+	if err != nil {
+		log.Fatalf("failed to send setpid: %v", err)
+	}
+	/*if err := c.JoinGroup(uint32(common.GroupID)); err != nil {
 		log.Fatalf("failed to join multicast group: %v", err)
-	}
+	}*/
 
-	return c, nil
+	return c, family, nil
 }
 
-func (n *time) decodeTime(ad *netlink.AttributeDecoder) error {
-	for ad.Next() {
-		switch ad.Type() {
-		case EXT4_CHAIN_ATTR_SEC:
-			n.sec = ad.Uint64()
-		case EXT4_CHAIN_ATTR_NSEC:
-			n.nsec = ad.Uint32()
-		}
-	}
-	return nil
-}
-
-func Listen(c *genetlink.Conn) error {
+func Listen(c *genetlink.Conn, family genetlink.Family) error {
 	for {
 		msgs, _, err := c.Receive()
 		if err != nil {
@@ -68,38 +46,130 @@ func Listen(c *genetlink.Conn) error {
 		}
 
 		for _, msg := range msgs {
-			log.Printf("messsage command: %v", msg.Header.Command)
-			if msg.Header.Command == EXT4_CHAIN_CMD_SET_ATTR {
-				log.Printf("EXT4_CHAIN_CMD_SET_ATTR")
-			} else if msg.Header.Command == EXT4_CHAIN_CMD_GET_ATTR {
-				log.Printf("EXT4_CHAIN_CMD_GET_ATTR")
-			} else {
-				log.Printf("UNKNOWN")
-			}
 			ad, err := netlink.NewAttributeDecoder(msg.Data)
 			if err != nil {
 				log.Fatalf("failed to create attribute decoder: %v", err)
 			}
 
-			var attributes attrs
+			var attributes common.Attrs
 			for ad.Next() {
 				switch ad.Type() {
-				case EXT4_CHAIN_ATTR_UID:
-					attributes.uid = ad.Uint32()
-				case EXT4_CHAIN_ATTR_GID:
-					attributes.gid = ad.Uint32()
-				case EXT4_CHAIN_ATTR_ATIME:
-					ad.Nested(attributes.atime.decodeTime)
-				case EXT4_CHAIN_ATTR_MTIME:
-					ad.Nested(attributes.mtime.decodeTime)
-				case EXT4_CHAIN_ATTR_CTIME:
-					ad.Nested(attributes.ctime.decodeTime)
-				case EXT4_CHAIN_ATTR_MODE:
-					attributes.mode = ad.Uint32()
-				case EXT4_CHAIN_ATTR_INO:
-					attributes.ino = ad.Uint64()
+				case common.EXT4_CHAIN_ATTR_UID:
+					attributes.Uid = ad.Uint32()
+				case common.EXT4_CHAIN_ATTR_GID:
+					attributes.Gid = ad.Uint32()
+				case common.EXT4_CHAIN_ATTR_ATIME:
+					ad.Nested(attributes.Atime.DecodeTime)
+				case common.EXT4_CHAIN_ATTR_MTIME:
+					ad.Nested(attributes.Mtime.DecodeTime)
+				case common.EXT4_CHAIN_ATTR_CTIME:
+					ad.Nested(attributes.Ctime.DecodeTime)
+				case common.EXT4_CHAIN_ATTR_MODE:
+					attributes.Mode = ad.Uint32()
+				case common.EXT4_CHAIN_ATTR_INO:
+					attributes.Ino = ad.Uint64()
 				}
 			}
+
+			if msg.Header.Command == common.EXT4_CHAIN_CMD_SETATTR_REQUEST {
+				status_code := fabric.SetAttributes(&attributes)
+				err := sendSetattrResponse(c, family, attributes.Ino, status_code)
+				if err != nil {
+					log.Printf("failed to send: ino: %v, status_code: %v", attributes.Ino, status_code)
+				}
+			}
+			/*if msg.Header.Command == common.EXT4_CHAIN_CMD_SETATTR_REQUEST {
+				/*err := fabric.SetAttributes(&attributes)
+				if err != nil {
+					log.Printf("failed to set attributes")
+				} else {
+					err := sendSetattrSuccess(c, family, attributes.Ino)
+					if err != nil {
+						log.Printf("failed to send SETATTR_SUCCESS")
+					}
+				}
+				err := sendSetattrSuccess(c, family, attributes.Ino)
+				if err != nil {
+					log.Printf("failed to send SETATTRSUCCESS")
+				}
+				//log.Printf("EXT4_CHAIN_CMD_SETATTR")
+			} else if msg.Header.Command == common.EXT4_CHAIN_CMD_GETATTR {
+				err := fabric.GetAttributes(attributes.Ino)
+				if err != nil {
+					log.Printf("failed to get attributes")
+				}
+			} else {
+				log.Printf("UNKNOWN")
+			}*/
 		}
 	}
 }
+
+func sendSetPid(c *genetlink.Conn, family genetlink.Family) error {
+	msg := genetlink.Message{
+		Header: genetlink.Header{
+			Command: common.EXT4_CHAIN_CMD_SETPID,
+			Version: family.Version,
+		},
+		Data: nil,
+	}
+
+	_, err := c.Send(msg, family.ID, netlink.Request)
+	if err != nil {
+		return err
+	}
+	log.Printf("sendSetPid: request sent")
+	return nil
+}
+
+func sendSetattrResponse(c *genetlink.Conn, family genetlink.Family, ino uint64, status_code uint16) error {
+	ae := netlink.NewAttributeEncoder()
+	ae.Uint64(common.EXT4_CHAIN_ATTR_INO, ino)
+	ae.Uint16(common.EXT4_CHAIN_ATTR_STATUS_CODE, status_code)
+
+	b, err := ae.Encode()
+	if err != nil {
+		log.Printf("failed to encode attributes: %v", err)
+	}
+
+	msg := genetlink.Message{
+		Header: genetlink.Header{
+			Command: common.EXT4_CHAIN_CMD_SETATTR_RESPONSE,
+			Version: family.Version,
+		},
+		Data: b,
+	}
+
+	_, err = c.Send(msg, family.ID, netlink.Request)
+	if err != nil {
+		return err
+	}
+	log.Printf("sendSetattrResponse: ino: %v, status_code: %v", ino, status_code)
+	return nil
+}
+
+/*func sendSetattrSuccess(c *genetlink.Conn, family genetlink.Family, ino uint64) error {
+	ae := netlink.NewAttributeEncoder()
+	ae.Uint64(common.EXT4_CHAIN_ATTR_INO, ino)
+	ae.Flag(common.EXT4_CHAIN_ATTR_SETATTR_SUCCESS, true)
+
+	b, err := ae.Encode()
+	if err != nil {
+		log.Printf("failed to encode attributes: %v", err)
+	}
+
+	msg := genetlink.Message{
+		Header: genetlink.Header{
+			Command: common.EXT4_CHAIN_CMD_SETATTR_HANDLE_RESPONSE,
+			Version: family.Version,
+		},
+		Data: b,
+	}
+
+	_, err = c.Send(msg, family.ID, netlink.Request)
+	if err != nil {
+		return err
+	}
+	log.Printf("sendSetattrSuccess: %v", ino)
+	return nil
+}*/

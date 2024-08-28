@@ -1,4 +1,4 @@
-module ext4_blockchain_integration
+module github.com/przemyslawS99/ext4-blockchain-integration
 
 go 1.22.4
 

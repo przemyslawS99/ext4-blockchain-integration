@@ -1,16 +1,17 @@
 package main
 
 import (
-	"errors"
 	"log"
 
-	"./internal/ext4"
+	"github.com/przemyslawS99/ext4-blockchain-integration/internal/ext4"
 )
 
 func main() {
-	c, err := NewConn()
+	c, family, err := ext4.NewConn()
 	if err != nil {
 		log.Fatalf("failed to connect")
 	}
-	err = Listen(c)
+	defer c.Close()
+
+	err = ext4.Listen(c, family)
 }

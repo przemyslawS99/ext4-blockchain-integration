@@ -22,9 +22,9 @@ type Attrs struct {
 func (n *Time) DecodeTime(ad *netlink.AttributeDecoder) error {
 	for ad.Next() {
 		switch ad.Type() {
-		case EXT4_CHAIN_TIME_ATTR_SEC:
+		case EXT4B_TIME_ATTR_SEC:
 			n.Sec = ad.Uint64()
-		case EXT4_CHAIN_TIME_ATTR_NSEC:
+		case EXT4B_TIME_ATTR_NSEC:
 			n.Nsec = ad.Uint32()
 		}
 	}

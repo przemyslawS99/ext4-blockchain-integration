@@ -54,28 +54,28 @@ func Listen(c *genetlink.Conn, family genetlink.Family) error {
 			var attributes common.Attrs
 			for ad.Next() {
 				switch ad.Type() {
-				case common.EXT4_CHAIN_ATTR_UID:
+				case common.EXT4B_ATTR_UID:
 					attributes.Uid = ad.Uint32()
-				case common.EXT4_CHAIN_ATTR_GID:
+				case common.EXT4B_ATTR_GID:
 					attributes.Gid = ad.Uint32()
-				case common.EXT4_CHAIN_ATTR_ATIME:
+				case common.EXT4B_ATTR_ATIME:
 					ad.Nested(attributes.Atime.DecodeTime)
-				case common.EXT4_CHAIN_ATTR_MTIME:
+				case common.EXT4B_ATTR_MTIME:
 					ad.Nested(attributes.Mtime.DecodeTime)
-				case common.EXT4_CHAIN_ATTR_CTIME:
+				case common.EXT4B_ATTR_CTIME:
 					ad.Nested(attributes.Ctime.DecodeTime)
-				case common.EXT4_CHAIN_ATTR_MODE:
+				case common.EXT4B_ATTR_MODE:
 					attributes.Mode = ad.Uint32()
-				case common.EXT4_CHAIN_ATTR_INO:
+				case common.EXT4B_ATTR_INO:
 					attributes.Ino = ad.Uint64()
 				}
 			}
 
-			if msg.Header.Command == common.EXT4_CHAIN_CMD_SETATTR_REQUEST {
-				status_code := fabric.SetAttributes(&attributes)
-				err := sendSetattrResponse(c, family, attributes.Ino, status_code)
+			if msg.Header.Command == common.EXT4B_CMD_SETATTR_REQUEST {
+				status := fabric.SetAttributes(&attributes)
+				err := sendSetattrResponse(c, family, attributes.Ino, status)
 				if err != nil {
-					log.Printf("failed to send: ino: %v, status_code: %v", attributes.Ino, status_code)
+					log.Printf("failed to send: ino: %v, status: %v", attributes.Ino, status)
 				}
 			}
 			/*if msg.Header.Command == common.EXT4_CHAIN_CMD_SETATTR_REQUEST {
@@ -108,7 +108,7 @@ func Listen(c *genetlink.Conn, family genetlink.Family) error {
 func sendSetPid(c *genetlink.Conn, family genetlink.Family) error {
 	msg := genetlink.Message{
 		Header: genetlink.Header{
-			Command: common.EXT4_CHAIN_CMD_SETPID,
+			Command: common.EXT4B_CMD_SETPID,
 			Version: family.Version,
 		},
 		Data: nil,
@@ -122,10 +122,10 @@ func sendSetPid(c *genetlink.Conn, family genetlink.Family) error {
 	return nil
 }
 
-func sendSetattrResponse(c *genetlink.Conn, family genetlink.Family, ino uint64, status_code uint16) error {
+func sendSetattrResponse(c *genetlink.Conn, family genetlink.Family, ino uint64, status uint16) error {
 	ae := netlink.NewAttributeEncoder()
-	ae.Uint64(common.EXT4_CHAIN_ATTR_INO, ino)
-	ae.Uint16(common.EXT4_CHAIN_ATTR_STATUS_CODE, status_code)
+	ae.Uint64(common.EXT4B_ATTR_INO, ino)
+	ae.Uint16(common.EXT4B_ATTR_STATUS, status)
 
 	b, err := ae.Encode()
 	if err != nil {
@@ -134,7 +134,7 @@ func sendSetattrResponse(c *genetlink.Conn, family genetlink.Family, ino uint64,
 
 	msg := genetlink.Message{
 		Header: genetlink.Header{
-			Command: common.EXT4_CHAIN_CMD_SETATTR_RESPONSE,
+			Command: common.EXT4B_CMD_SETATTR_RESPONSE,
 			Version: family.Version,
 		},
 		Data: b,
@@ -144,7 +144,7 @@ func sendSetattrResponse(c *genetlink.Conn, family genetlink.Family, ino uint64,
 	if err != nil {
 		return err
 	}
-	log.Printf("sendSetattrResponse: ino: %v, status_code: %v", ino, status_code)
+	log.Printf("sendSetattrResponse: ino: %v, status_code: %v", ino, status)
 	return nil
 }
 

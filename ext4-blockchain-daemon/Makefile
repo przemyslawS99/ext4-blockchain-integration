@@ -8,5 +8,5 @@ vet: fmt
 	go vet ./...
 
 build: vet
-	go build -o ext4-chain-daemon ./cmd/ext4-chain-daemon
+	go build -o ./bin/ext4-chain-daemon ./cmd/ext4-chain-daemon
 

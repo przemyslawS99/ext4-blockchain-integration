@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/przemyslawS99/ext4-blockchain-integration/internal/ext4"
+	"github.com/przemyslawS99/ext4-blockchain-integration/ext4-blockchain-daemon/internal/ext4"
 )
 
 func main() {

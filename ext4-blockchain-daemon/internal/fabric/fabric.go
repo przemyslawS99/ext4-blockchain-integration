@@ -3,7 +3,7 @@ package fabric
 import (
 	"log"
 
-	"github.com/przemyslawS99/ext4-blockchain-integration/internal/common"
+	"github.com/przemyslawS99/ext4-blockchain-integration/ext4-blockchain-daemon/internal/common"
 )
 
 func NewInode(attributes *common.Attrs) uint16 {

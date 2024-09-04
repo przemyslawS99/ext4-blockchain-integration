@@ -1,4 +1,4 @@
-module github.com/przemyslawS99/ext4-blockchain-integration
+module github.com/przemyslawS99/ext4-blockchain-integration/ext4-blockchain-daemon
 
 go 1.22.4
 

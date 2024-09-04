@@ -7,8 +7,8 @@ import (
 
 	"github.com/mdlayher/genetlink"
 	"github.com/mdlayher/netlink"
-	"github.com/przemyslawS99/ext4-blockchain-integration/internal/common"
-	"github.com/przemyslawS99/ext4-blockchain-integration/internal/fabric"
+	"github.com/przemyslawS99/ext4-blockchain-integration/ext4-blockchain-daemon/internal/common"
+	"github.com/przemyslawS99/ext4-blockchain-integration/ext4-blockchain-daemon/internal/fabric"
 )
 
 func NewConn() (*genetlink.Conn, genetlink.Family, error) {

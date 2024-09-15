@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 
+	"github.com/hyperledger/fabric-gateway/pkg/client"
 	"github.com/mdlayher/genetlink"
 	"github.com/mdlayher/netlink"
 	"github.com/przemyslawS99/ext4-blockchain-integration/ext4-blockchain-daemon/internal/common"
@@ -35,7 +36,7 @@ func NewConn() (*genetlink.Conn, genetlink.Family, error) {
 	return c, family, nil
 }
 
-func Listen(c *genetlink.Conn, family genetlink.Family) error {
+func Listen(c *genetlink.Conn, family genetlink.Family, contract *client.Contract) error {
 	for {
 		msgs, _, err := c.Receive()
 		if err != nil {
@@ -49,7 +50,7 @@ func Listen(c *genetlink.Conn, family genetlink.Family) error {
 				if err != nil {
 					log.Fatalf("failed to decode attributes: %v", err)
 				}
-				status := fabric.NewInode(attributes)
+				status := fabric.NewInode(attributes, contract)
 				err = sendStatusResponse(c, family, attributes.Ino, status)
 				if err != nil {
 					log.Printf("failed to send: ino=%v, status=%v", attributes.Ino, status)
@@ -60,7 +61,7 @@ func Listen(c *genetlink.Conn, family genetlink.Family) error {
 				if err != nil {
 					log.Fatalf("failed to decode attributes: %v", err)
 				}
-				status := fabric.SetAttributes(attributes)
+				status := fabric.SetAttributes(attributes, contract)
 				err = sendStatusResponse(c, family, attributes.Ino, status)
 				if err != nil {
 					log.Printf("failed to send: ino=%v, status=%v", attributes.Ino, status)
@@ -71,7 +72,7 @@ func Listen(c *genetlink.Conn, family genetlink.Family) error {
 				if err != nil {
 					log.Fatalf("failed to decode ino: %v", err)
 				}
-				status, attributes := fabric.GetAttributes(ino)
+				status, attributes := fabric.GetAttributes(ino, contract)
 				err = sendGetAttributesResponse(c, family, attributes, status)
 				if err != nil {
 					log.Printf("failed to send: ino=%v, status=%v", ino, status)
